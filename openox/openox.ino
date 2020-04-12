@@ -1,6 +1,8 @@
 #include <LiquidCrystal.h>
 #include <RotaryEncoder.h>
 #include "configuration.h"
+#include <Wire.h>
+#include <Adafruit_ADS1015.h>
 
 enum class Status {
   ACTIVE,
@@ -34,6 +36,8 @@ const int valve_2 = 16;
 const int valve_3 = 15;
 const int valve_4 = 14;
 
+Adafruit_ADS1115 oxygen_ADC;
+
 int lastEncoderButtonState = HIGH;
 int lastEncoderButtonStateStable = HIGH;
 unsigned long lastEncoderButtonSwitchTime = 0;
@@ -57,6 +61,18 @@ void setup() {
   pinMode(valve_3, OUTPUT);
   pinMode(valve_4, OUTPUT);
   lcd.begin(lcdCols, lcdRows);
+
+  oxygen_ADC.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.0078125mV
+  oxygen_ADC.begin();
+}
+
+float getOxygenConcentration()
+{
+  const float calibration_coeffitient = 0.00223;
+  int32_t adc0;
+  adc0 = oxygen_ADC.readADC_SingleEnded(0);
+  return calibration_coeffitient * 1000 * adc0 * 0.0078125;
+  //Serial.print("AIN0: "); Serial.println();
 }
 
 void showStatusScreen(float oxygenLevel, float flow, Status s) {
@@ -142,7 +158,7 @@ void loop() {
   int encoderPosition = encoder.getPosition();
   switch (screen) {
     case Screen::STATUS:
-      showStatusScreen(1.2, 0.2, Status::ACTIVE);
+      showStatusScreen(1.2, getOxygenConcentration(), Status::ACTIVE);
       break;
     case Screen::CALIBRATE:
       calibrateValue = calibrateEncoderAdjustment - encoderPosition;
