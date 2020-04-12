@@ -1,0 +1,3 @@
+#define VALVE_1_PIN 35
+//#define HW_SHIELD OPENOX_SHIELD
+#define HW_SHIELD RAMPS

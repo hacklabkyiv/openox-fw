@@ -1,5 +1,6 @@
 #include <LiquidCrystal.h>
 #include <RotaryEncoder.h>
+#include "configuration.h"
 
 enum class Status {
   ACTIVE,
@@ -8,27 +9,53 @@ enum class Status {
 
 enum class Screen {
   STATUS,
-  CALIBRATE
+  CALIBRATE,
+  DEBUG_TIMINGS
 };
 
+/* HW Configuration */
+#ifdef OPENOX_SHIELD
+RotaryEncoder encoder(33, 32);
+LiquidCrystal lcd(27, 26, 28, 29, 30, 31);
+const int encoderButtonPin = 25;
+const int buzzer = 24;
+#else
 RotaryEncoder encoder(33, 31);
 LiquidCrystal lcd(16, 17, 23, 25, 27, 29);
 const int encoderButtonPin = 35;
+const int buzzer = 37;
+#endif
+
+const int lcdCols = 20;
+const int lcdRows = 4;
+
+const int valve_1 = 17;
+const int valve_2 = 16;
+const int valve_3 = 15;
+const int valve_4 = 14;
+
 int lastEncoderButtonState = HIGH;
 int lastEncoderButtonStateStable = HIGH;
 unsigned long lastEncoderButtonSwitchTime = 0;
-const int buzzer = 37;
-const int lcdCols = 20;
-const int lcdRows = 4;
+
 Screen screen = Screen::STATUS;
 
 int calibrateValue = 100;
 int calibrateEncoderAdjustment = 0;
 
+int adsorptionCycleDuration = 2000;
+int adsorptionEncoderAdjustment = 0;
+
+unsigned long lastRelaySwitch = millis();
+int relayState = 0;
+
 void setup() {
   pinMode(encoderButtonPin, INPUT_PULLUP);
   pinMode(buzzer, OUTPUT);
-  noTone(buzzer);
+  pinMode(valve_1, OUTPUT);
+  pinMode(valve_2, OUTPUT);
+  pinMode(valve_3, OUTPUT);
+  pinMode(valve_4, OUTPUT);
   lcd.begin(lcdCols, lcdRows);
 }
 
@@ -77,6 +104,25 @@ void showCalibrateScreen(float value) {
   lcd.print("Calibrate");
 
   if (fabs(value) > 9999) {
+    value = 9999;
+  } else if (fabs(value) < 500) {
+    value = 500;
+  } else {
+    dtostrf(value, 0, 2, out);
+  }
+  lcd.setCursor(0, 1);
+  lcd.print("Value ");
+  lcd.print(out);
+}
+
+void showDebugTimingsScreen(int value) {
+  char out[lcdCols];
+  const char errorMessage[] = "err";
+  
+  lcd.setCursor(0, 0);
+  lcd.print("Timings");
+
+  if (fabs(value) > 9999) {
     strncpy(out, errorMessage, sizeof(errorMessage) + 1);
   } else {
     dtostrf(value, 0, 2, out);
@@ -84,6 +130,11 @@ void showCalibrateScreen(float value) {
   lcd.setCursor(0, 1);
   lcd.print("Value ");
   lcd.print(out);
+  if (abs(millis() - lastRelaySwitch) > value) {
+    digitalWrite(3, relayState);
+    relayState = !relayState;
+    lastRelaySwitch = millis();
+  }
 }
 
 void loop() {
@@ -96,6 +147,11 @@ void loop() {
     case Screen::CALIBRATE:
       calibrateValue = calibrateEncoderAdjustment - encoderPosition;
       showCalibrateScreen(calibrateValue);
+      lastRelaySwitch = millis();
+      break;
+    case Screen::DEBUG_TIMINGS:
+      adsorptionCycleDuration = adsorptionEncoderAdjustment - 200*encoderPosition;
+      showDebugTimingsScreen(adsorptionCycleDuration);
       break;
   }
 
@@ -114,6 +170,12 @@ void loop() {
           screen = Screen::CALIBRATE;
           break;
         case Screen::CALIBRATE:
+          screen = Screen::DEBUG_TIMINGS;
+          adsorptionEncoderAdjustment = adsorptionCycleDuration + 200*encoderPosition;
+          lastRelaySwitch = millis();
+          relayState = 0;
+          break;
+        case Screen::DEBUG_TIMINGS:
           screen = Screen::STATUS;
           break;
       }
