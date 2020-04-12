@@ -131,7 +131,7 @@ void showDebugTimingsScreen(int value) {
   lcd.print("Value ");
   lcd.print(out);
   if (abs(millis() - lastRelaySwitch) > value) {
-    digitalWrite(3, relayState);
+    digitalWrite(valve_1, relayState);
     relayState = !relayState;
     lastRelaySwitch = millis();
   }
