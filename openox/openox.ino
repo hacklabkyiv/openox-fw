@@ -53,6 +53,8 @@ int adsorptionEncoderAdjustment = 0;
 unsigned long lastRelaySwitch = millis();
 int relayState = 0;
 
+float calibrationCoeffitient = 0.00223;
+
 void setup() {
   pinMode(encoderButtonPin, INPUT_PULLUP);
   pinMode(buzzer, OUTPUT);
@@ -66,42 +68,46 @@ void setup() {
   oxygen_ADC.begin();
 }
 
-float getOxygenConcentration()
+float getOxygenConcentration(float calibrationCoeff)
 {
-  const float calibration_coeffitient = 0.00223;
+  const float adc_mv_per_bit = 0.0078125;
   int32_t adc0;
   adc0 = oxygen_ADC.readADC_SingleEnded(0);
-  return calibration_coeffitient * 1000 * adc0 * 0.0078125;
-  //Serial.print("AIN0: "); Serial.println();
+  return calibrationCoeff * 1000 * adc0 * adc_mv_per_bit;
 }
 
-void showStatusScreen(float oxygenLevel, float flow, Status s) {
+void showStatusScreen(float oxygenLevel, float flow, Status s, int relayState) {
   char out[lcdCols];
   const char errorMessage[] = "err";
-  const char statusActive[] = "ACTIVE";
+  const char statusActiveValve1[] = "ACTIVE <";
+  const char statusActiveValve2[] = "ACTIVE >";
   const char statusOff[] = "OFF";
 
   if (fabs(oxygenLevel) > 9999) {
     strncpy(out, errorMessage, sizeof(errorMessage) + 1);
   } else {
-    dtostrf(oxygenLevel, 0, 2, out);
+    dtostrf(oxygenLevel, 0, 1, out);
   }
   lcd.setCursor(0, 0);
-  lcd.print("Level ");
+  lcd.print("Oxygen Level ");
   lcd.print(out);
-
+  lcd.print(" %");
+  
   if (fabs(flow) > 9999) {
     strncpy(out, errorMessage, sizeof(errorMessage) + 1);
   } else {
-    dtostrf(flow, 0, 2, out);
+    dtostrf(flow, 0, 1, out);
   }
   lcd.setCursor(0, 1);
   lcd.print("Flow ");
   lcd.print(out);
-
+  lcd.print(" lpm");
   switch (s) {
     case Status::ACTIVE:
-      strncpy(out, statusActive, sizeof(statusActive) + 1);
+      if (relayState)
+        strncpy(out, statusActiveValve1, sizeof(statusActiveValve1) + 1);
+      else
+        strncpy(out, statusActiveValve2, sizeof(statusActiveValve2) + 1);
       break;
     case Status::OFF:
       strncpy(out, statusOff, sizeof(statusOff) + 1);
@@ -146,11 +152,6 @@ void showDebugTimingsScreen(int value) {
   lcd.setCursor(0, 1);
   lcd.print("Value ");
   lcd.print(out);
-  if (abs(millis() - lastRelaySwitch) > value) {
-    digitalWrite(valve_1, relayState);
-    relayState = !relayState;
-    lastRelaySwitch = millis();
-  }
 }
 
 void loop() {
@@ -158,7 +159,7 @@ void loop() {
   int encoderPosition = encoder.getPosition();
   switch (screen) {
     case Screen::STATUS:
-      showStatusScreen(1.2, getOxygenConcentration(), Status::ACTIVE);
+      showStatusScreen(getOxygenConcentration(calibrationCoeffitient), 0, Status::ACTIVE, relayState);
       break;
     case Screen::CALIBRATE:
       calibrateValue = calibrateEncoderAdjustment - encoderPosition;
@@ -197,5 +198,11 @@ void loop() {
       }
     }
     lastEncoderButtonStateStable = reading;
+  }
+  /* Handle valve state */
+  if (abs(millis() - lastRelaySwitch) > adsorptionCycleDuration) {
+    digitalWrite(valve_1, relayState);
+    relayState = !relayState;
+    lastRelaySwitch = millis();
   }
 }
