@@ -207,6 +207,7 @@ void loop() {
   /* Handle valve state */
   if (abs(millis() - lastRelaySwitch) > adsorptionCycleDuration) {
     digitalWrite(valve_1, relayState);
+    digitalWrite(valve_2, !relayState);
     relayState = !relayState;
     lastRelaySwitch = millis();
   }
