@@ -3,6 +3,7 @@
 #include "configuration.h"
 #include <Wire.h>
 #include <Adafruit_ADS1015.h>
+#include <EEPROM.h>
 
 enum class Status {
   ACTIVE,
@@ -49,7 +50,7 @@ int calibrateEncoderAdjustment = 0;
 
 int adsorptionCycleDuration = 2000;
 int adsorptionEncoderAdjustment = 0;
-
+int adsorptionCycleDurationAddress = 0;
 unsigned long lastRelaySwitch = millis();
 int relayState = 0;
 
@@ -66,6 +67,9 @@ void setup() {
 
   oxygen_ADC.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.0078125mV
   oxygen_ADC.begin();
+
+  /* Load settings from eeprom */
+  EEPROM.get(adsorptionCycleDurationAddress, adsorptionCycleDuration);
 }
 
 float getOxygenConcentration(float calibrationCoeff)
@@ -144,11 +148,12 @@ void showDebugTimingsScreen(int value) {
   lcd.setCursor(0, 0);
   lcd.print("Timings");
 
-  if (fabs(value) > 9999) {
+  if (fabs(value) > 99999) {
     strncpy(out, errorMessage, sizeof(errorMessage) + 1);
   } else {
-    dtostrf(value, 0, 2, out);
+    sprintf(out, "%d", value);
   }
+  EEPROM.put(adsorptionCycleDurationAddress, value);
   lcd.setCursor(0, 1);
   lcd.print("Value ");
   lcd.print(out);
