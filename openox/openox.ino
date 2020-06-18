@@ -63,6 +63,10 @@ void setup() {
   pinMode(valve_2, OUTPUT);
   pinMode(valve_3, OUTPUT);
   pinMode(valve_4, OUTPUT);
+
+  // One valve should be open to prevent overpressure at the start
+  digitalWrite(valve_1, HIGH);
+  
   lcd.begin(lcdCols, lcdRows);
 
   oxygen_ADC.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.0078125mV
